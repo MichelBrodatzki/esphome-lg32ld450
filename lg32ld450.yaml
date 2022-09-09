@@ -1,0 +1,66 @@
+esphome:
+  name: lg32ld450
+  comment: Controls a LG32LD450
+  includes:
+    - uart_sensor.h
+
+esp8266:
+  board: nodemcuv2
+
+# Enable logging
+logger:
+
+
+# Enable Home Assistant API
+api:
+  password: !secret api_pass
+
+ota:
+  password: !secret ota_pass
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_pass
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "LG32LD450 Fallback Hotspot"
+    password: !secret fallback_pass
+
+captive_portal:
+
+uart:
+  id: uart_tv
+  rx_pin: D1
+  tx_pin: D2
+  baud_rate: 9600
+
+switch:
+  - platform: template
+    name: "TV Power"
+    lambda: |-
+      if (id(tv_response).state == "a 01 OK00x") {  // Power state is "off"
+        return false;
+      } else if (id(tv_response).state == "a 01 OK01x") { // Power state is "on"
+        return true;
+      } else {
+        return {};
+      }
+    turn_on_action:
+      - uart.write: "ka 00 01\r"
+    turn_off_action:
+      - uart.write: "ka 00 00\r"
+
+text_sensor:
+  - platform: custom
+    lambda: |-
+      auto uartSensor = new UARTSensor(id(uart_tv));
+      App.register_component(uartSensor);
+      return {uartSensor};
+    text_sensors:
+      id: "tv_response"
+  
+interval:
+  - interval: 10s
+    then:
+      - uart.write: "ka 00 ff\r"  # Ask for power state
